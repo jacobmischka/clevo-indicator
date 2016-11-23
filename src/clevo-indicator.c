@@ -63,7 +63,7 @@
  * 1. modprobe ec_sys
  * 2. od -Ax -t x1 /sys/kernel/debug/ec/ec0/io
  */
- 
+
 #define P775DM3 //THIS IS THE MODEL DEFINITION, TO FIND THE ADDRESSES IN THE EC
 
 #define EC_REG_SIZE 0x100
@@ -154,143 +154,59 @@ struct {
 
 static pid_t parent_pid = 0;
 
+static int autoset_cpu_duty_adjust(void) {
+    int temp = ec_query_cpu_temp();
+    int duty = ec_query_cpu_fan_duty();
+    //
+    if (temp >= 80 && duty < 100)
+        return 100;
+    if (temp >= 70 && duty < 90)
+        return 90;
+    if (temp >= 60 && duty < 80)
+        return 80;
+    if (temp >= 50 && duty < 70)
+        return 70;
+    if (temp >= 40 && duty < 60)
+        return 60;
+    if (temp >= 30 && duty < 50)
+        return 50;
+    if (temp >= 20 && duty < 40)
+        return 40;
+    if (temp >= 10 && duty < 30)
+        return 30;
+    //
+    if (temp <= 15 && duty > 30)
+        return 30;
+    if (temp <= 25 && duty > 40)
+        return 40;
+    if (temp <= 35 && duty > 50)
+        return 50;
+    if (temp <= 45 && duty > 60)
+        return 60;
+    if (temp <= 55 && duty > 70)
+        return 70;
+    if (temp <= 65 && duty > 80)
+        return 80;
+    if (temp <= 75 && duty > 90)
+        return 90;
+    //
+    return 0;
+}
+
 void autoset_cpu_gpu()
 {
-    struct sched_param param;
-    param.sched_priority = 99;
-    if (sched_setscheduler(0, SCHED_FIFO, & param) != 0)
-    {
-        printf("sched_setscheduler error\n");
-        exit(EXIT_FAILURE);  
+    int duty;
+    while(1){
+        duty = autoset_cpu_duty_adjust();
+        if(duty > 0){
+            main_test_cpu_fan(duty);
+        }
+        else {
+            printf("No change\n");
+            main_dump_fan();
+        }
+        usleep(2 * 1000 * 1000);
     }
-
-    int current[2] = {0, 0};
-    double lastCPU, lastGPU;
-    int repeatCheck[2] = {0, 0};
-    int lastfail = 0;
-    int missing = 0;
-
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0;
-    while (1)
-    {
-        //printf("Checking\n");
-        if (missing > 5)
-        {
-            ec_write_gpu_fan_duty(50);
-            ec_write_cpu_fan_duty(50);
-            exit(1);
-        }
-        
-        char buffer[10];
-        double gputemp;
-        int found = 0;
-        while (!feof(stdin))
-        {
-            FD_SET(STDIN_FILENO, &readfds);
-            if (!select(1, &readfds, NULL, NULL, &timeout)) break;
-            int nRead = read(STDIN_FILENO, buffer, 3);
-            //printf("Read %d\n", nRead);
-            if (nRead == 0) break;
-            found = 1;
-            gputemp = atoi(buffer);
-        };
-
-        if (found)
-        {
-            double cputemp = ec_query_cpu_temp();
-
-            int cur_cpu_setting = ec_query_cpu_fan_duty();
-            double avg[2];
-            if (cputemp > gputemp)
-            {
-                avg[0] = cputemp;
-                avg[1] = (2 * gputemp + cputemp) / 3;
-            }
-            else
-            {
-                avg[1] = gputemp;
-                avg[0] = (2 * cputemp + gputemp) / 3;
-            }
-            if (lastCPU > 30) avg[0] = (2 * avg[0] + lastCPU) / 3;
-            if (lastGPU > 30) avg[1] = (2 * avg[1] + lastGPU) / 3;
-            lastCPU = avg[0];
-            lastGPU = avg[1];
-
-            if (avg[1] <= 65) avg[1] -= 5;
-            else if (avg[1] <= 70) avg[1] -= (70 - avg[1]);
-
-            int setDuty[2];
-            for (int i = 0;i < 2;i++)
-            {
-                if (avg[i] <= 40) setDuty[i] = 0;
-                else if (avg[i] <= 45) setDuty[i] = 15;
-                else if (avg[i] <= 75) setDuty[i] = avg[i] - 30;
-                else if (avg[i] <= 90) setDuty[i] = (avg[i] - 75) * 3 + 45;
-                else setDuty[i] = 100;
-            }
-
-            int doSet[2] = {0, 0};
-            for (int i = 0;i < 2;i++)
-            {
-                if (current[i] == 0 && setDuty[i] != 0) doSet[i] = 1;
-                else if (setDuty[i] > current[i] && setDuty[i] > 50) doSet[i] = 1;
-                else if (setDuty[i] > current[i] + 1) doSet[i] = 1;
-                else if (setDuty[i] < current[i] - 5) doSet[i] = 1;
-                else if (setDuty[i] < current[i])
-                {
-                    if (repeatCheck[i] >= 4)
-                        doSet[i] = 1;
-                    else
-                        repeatCheck[i]++;
-                }
-
-                if (doSet[i]) repeatCheck[i] = 0;
-            }
-            if (cur_cpu_setting != current[0]) doSet[0] = doSet[1] = 1;
-
-            if (cputemp < 15 || gputemp < 15)
-            {
-                if (lastfail)
-                {
-                    doSet[0] = doSet[1] = 1;
-                    if (setDuty[0] < 50) setDuty[0] = 50;
-                    if (setDuty[1] < 50) setDuty[1] = 50;
-                }
-                else
-                {
-                    lastfail = 1;
-                    doSet[0] = doSet[1] = 0;
-                }
-            }
-            else
-            {
-                lastfail = 0;
-            }
-
-
-            printf("Temperatures C: %f G: %f --> %f %f --> Duty: %d %d (%d)- Set %d %d\n", cputemp, gputemp, avg[0], avg[1], setDuty[0], setDuty[1], cur_cpu_setting, doSet[0], doSet[1]);
-            
-            for (int i = 0;i < 2;i++)
-            {
-                if (doSet[i])
-                {
-                    current[i] = setDuty[i];
-                    if (i) ec_write_gpu_fan_duty(setDuty[1]);
-                    else ec_write_cpu_fan_duty(setDuty[0]);
-                }
-            }
-            missing = 0;
-        }
-        else
-        {
-            missing++;
-        }
-        usleep(2000000);
-    };
 }
 
 int main(int argc, char* argv[]) {
@@ -437,7 +353,7 @@ DO NOT MANIPULATE OR QUERY EC I/O PORTS WHILE THIS PROGRAM IS RUNNING.\n\
     else if (strcmp(argv[1], "auto") == 0) {
         autoset_cpu_gpu();
     }
-    
+
     return EXIT_SUCCESS;
 }
 
@@ -460,7 +376,7 @@ static int main_ec_worker(void) {
     setuid(0);
     system("modprobe ec_sys");
     FILE* io_fd = fopen("/sys/kernel/debug/ec/ec0/io", "r");
-    if (io_fd <= 0) 
+    if (io_fd <= 0)
     {
         printf("unable to read EC from sysfs: %s\n", strerror(errno));
         exit(EXIT_FAILURE);

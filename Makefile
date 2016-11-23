@@ -9,7 +9,7 @@ OBJDIR := obj
 SRCDIR := src
 
 SRC = clevo-indicator.c
-OBJ = $(patsubst %.c,$(OBJDIR)/%.o,$(SRC)) 
+OBJ = $(patsubst %.c,$(OBJDIR)/%.o,$(SRC))
 
 TARGET = bin/clevo-indicator
 
@@ -25,7 +25,7 @@ install: $(TARGET)
 test: $(TARGET)
 	@sudo chown root $(TARGET)
 	@sudo chgrp adm  $(TARGET)
-	@sudo chmod 4750 $(TARGET)
+	@sudo chmod 4755 $(TARGET)
 
 $(TARGET): $(OBJ) Makefile
 	@mkdir -p bin
@@ -36,7 +36,7 @@ clean:
 	rm $(OBJ) $(TARGET)
 
 $(OBJDIR)/%.o : $(SRCDIR)/%.c Makefile
-	@echo compiling $< 
+	@echo compiling $<
 	@mkdir -p obj
 	@$(CC) $(CFLAGS) -c $< -o $@
 
