@@ -1,0 +1,11 @@
+[Unit]
+Description=Enable clevo fan control
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/home/mischka/projects/clevo-indicator/bin/clevo-indicator auto
+
+[Install]
+WantedBy=default.target
