@@ -162,29 +162,29 @@ static int autoset_cpu_duty_adjust(void) {
         return 100;
     if (temp >= 75 && duty < 90)
         return 90;
-    if (temp >= 65 && duty < 80)
+    if (temp >= 70 && duty < 80)
         return 80;
-    if (temp >= 55 && duty < 70)
+    if (temp >= 65 && duty < 70)
         return 70;
-    if (temp >= 45 && duty < 60)
+    if (temp >= 60 && duty < 60)
         return 60;
-    if (temp >= 35 && duty < 50)
+    if (temp >= 50 && duty < 50)
         return 50;
-    if (temp >= 25 && duty < 40)
+    if (temp >= 40 && duty < 40)
         return 40;
-    if (temp >= 15 && duty < 30)
+    if (temp >= 30 && duty < 30)
         return 30;
     //
     if (temp <= 20 && duty > 30)
-        return 30;
+        return 20;
     if (temp <= 30 && duty > 40)
-        return 40;
+        return 30;
     if (temp <= 40 && duty > 50)
-        return 50;
+        return 40;
     if (temp <= 50 && duty > 60)
-        return 60;
+        return 50;
     if (temp <= 60 && duty > 70)
-        return 70;
+        return 60;
     if (temp <= 70 && duty > 80)
         return 80;
     if (temp <= 80 && duty > 90)
@@ -201,10 +201,10 @@ void autoset_cpu_gpu()
         if(duty > 0){
             main_test_cpu_fan(duty);
         }
-        else {
-            printf("No change\n");
-            main_dump_fan();
-        }
+        /*else {*/
+            /*printf("No change\n");*/
+            /*main_dump_fan();*/
+        /*}*/
         usleep(2 * 1000 * 1000);
     }
 }
